@@ -72,5 +72,35 @@
     <Image Include="Resources\novi sad bolji.jpg">
       <Filter>resources</Filter>
     </Image>
+    <Image Include="Resources\0.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="Resources\1.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="Resources\2.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="Resources\3.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="Resources\4.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="Resources\5.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="Resources\6.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="Resources\7.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="Resources\8.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="Resources\9.png">
+      <Filter>resources</Filter>
+    </Image>
   </ItemGroup>
 </Project>

@@ -43,6 +43,20 @@ unsigned pinTexture;
 unsigned indexTexture;
 unsigned cikicaTexture;
 unsigned rulerTexture;
+unsigned zero_texture;
+unsigned one_texture;
+unsigned two_texture;
+unsigned three_texture;
+unsigned four_texture;
+unsigned five_texture;
+unsigned six_texture;
+unsigned seven_texture;
+unsigned eight_texture;
+unsigned nine_texture;
+
+
+
+
 
 GLFWcursor* cursor;
 GLFWcursor* cursorPressed;
@@ -131,6 +145,16 @@ int main()
     preprocessTexture(indexTexture, "resources/crveni index.png");
     preprocessTexture(cikicaTexture, "resources/cikica.png");
     preprocessTexture(rulerTexture, "resources/ruler.png");
+    preprocessTexture(zero_texture, "resources/0.png");
+    preprocessTexture(one_texture, "resources/1.png");
+    preprocessTexture(two_texture, "resources/2.png");
+    preprocessTexture(three_texture, "resources/3.png");
+    preprocessTexture(four_texture, "resources/4.png");
+    preprocessTexture(five_texture, "resources/5.png");
+    preprocessTexture(six_texture, "resources/6.png");
+    preprocessTexture(seven_texture, "resources/7.png");
+    preprocessTexture(eight_texture, "resources/8.png");
+    preprocessTexture(nine_texture, "resources/9.png");
 
     cursor = loadImageToCursor("resources/bolji-compass.png");
     glfwSetCursor(window, cursor);
@@ -299,6 +323,48 @@ int main()
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
+    float digitVertices[5][16];
+
+    float startX = -0.25f;
+    float endX = 0.25f;
+    float width = (endX - startX) / 5.0f;   // = 0.12
+
+    float topY = 1.0f;
+    float bottomY = 0.85f;
+
+    for (int i = 0; i < 5; i++)
+    {
+        float x0 = startX + i * width;
+        float x1 = x0 + width;
+
+        digitVertices[i][0] = x0; digitVertices[i][1] = topY;    digitVertices[i][2] = 0.0f; digitVertices[i][3] = 1.0f;
+        digitVertices[i][4] = x0; digitVertices[i][5] = bottomY; digitVertices[i][6] = 0.0f; digitVertices[i][7] = 0.0f;
+        digitVertices[i][8] = x1; digitVertices[i][9] = bottomY; digitVertices[i][10] = 1.0f; digitVertices[i][11] = 0.0f;
+        digitVertices[i][12] = x1; digitVertices[i][13] = topY;  digitVertices[i][14] = 1.0f; digitVertices[i][15] = 1.0f;
+    }
+
+
+    unsigned int digitVAO[5];
+    unsigned int digitVBO[5];
+    for (int i = 0; i < 5; i++)
+    {
+        glGenVertexArrays(1, &digitVAO[i]);
+        glGenBuffers(1, &digitVBO[i]);
+
+        glBindVertexArray(digitVAO[i]);
+        glBindBuffer(GL_ARRAY_BUFFER, digitVBO[i]);
+
+        glBufferData(GL_ARRAY_BUFFER, sizeof(digitVertices[i]), digitVertices[i], GL_STATIC_DRAW);
+
+        // Attribute 0: vec2 position
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+
+        // Attribute 1: vec2 UV
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+        glEnableVertexAttribArray(1);
+    }
+
 
     glClearColor(0.2f, 0.8f, 0.6f, 1.0f);
 
@@ -331,8 +397,8 @@ int main()
             if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) uX -= speed;
 
             // distancefrom start
-            float dx = uX - startX;
-            float dy = uY - startY;
+            float dx = uX ;
+            float dy = uY ;
             displacementDistance = std::sqrt(dx * dx + dy * dy);
 
 
@@ -346,6 +412,64 @@ int main()
             glBindTexture(GL_TEXTURE_2D, mapTexture);
             glBindVertexArray(VAOwalkingMap);
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+
+
+            unsigned int digitTextures[10] = {
+    zero_texture,
+    one_texture,
+    two_texture,
+    three_texture,
+    four_texture,
+    five_texture,
+    six_texture,
+    seven_texture,
+    eight_texture,
+    nine_texture
+            };
+
+
+
+
+
+            float dist = displacementDistance;
+
+            // prepare array of 5 digit indices (0–9)
+            int displayDigits[5];
+
+            // ---- integer part (first 3 digits) ----
+            int d = (int)(dist * 100.0f);  // shift decimals so we can extract easily
+
+            int digit0 = (d / 100000) % 10;  // thousands
+            int digit1 = (d / 10000) % 10;  // thousands
+            int digit2 = (d / 1000) % 10;  // hundreds
+            int digit3 = (d / 100) % 10;  // tens
+
+            // ---- first 2 decimal digits ----
+            int firstDecimal = ((int)(dist * 10)) % 10;   // tenths
+
+            displayDigits[0] = digit0;
+            displayDigits[1] = digit1;
+            displayDigits[2] = digit2;
+            displayDigits[3] = digit3;
+            displayDigits[4] = firstDecimal;
+            glUseProgram(textureShader);
+            glActiveTexture(GL_TEXTURE0);
+
+            for (int i = 0; i < 5; i++)
+            {
+                int d = displayDigits[i];  // the digit to show (0–9)
+
+                glBindTexture(GL_TEXTURE_2D, digitTextures[d]);
+
+                glBindVertexArray(digitVAO[i]);
+                glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+            }
+
+
+
+
+
 
             //draw pin
             glUseProgram(textureShader);

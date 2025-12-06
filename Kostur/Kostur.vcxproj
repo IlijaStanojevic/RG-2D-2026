@@ -102,11 +102,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>opengl32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -143,6 +145,16 @@
     <None Include="text.vert" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="Resources\0.png" />
+    <Image Include="Resources\1.png" />
+    <Image Include="Resources\2.png" />
+    <Image Include="Resources\3.png" />
+    <Image Include="Resources\4.png" />
+    <Image Include="Resources\5.png" />
+    <Image Include="Resources\6.png" />
+    <Image Include="Resources\7.png" />
+    <Image Include="Resources\8.png" />
+    <Image Include="Resources\9.png" />
     <Image Include="Resources\bolji-compass.png" />
     <Image Include="Resources\cikica.png" />
     <Image Include="Resources\compass.png" />
