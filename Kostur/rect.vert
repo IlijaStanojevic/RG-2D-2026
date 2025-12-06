@@ -11,6 +11,6 @@ uniform float uS;
 
 void main()
 {
-    gl_Position = vec4(inPos.x + uX, inPos.y * uS + uY, 0.0, 1.0);
+    gl_Position = vec4(inPos.x, inPos.y, 0.0, 1.0);
     chTex = inTex;
 }
