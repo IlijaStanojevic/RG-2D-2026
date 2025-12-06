@@ -134,6 +134,8 @@
   <ItemGroup>
     <None Include="basic.frag" />
     <None Include="basic.vert" />
+    <None Include="map.frag" />
+    <None Include="map.vert" />
     <None Include="packages.config" />
     <None Include="rect.frag" />
     <None Include="rect.vert" />

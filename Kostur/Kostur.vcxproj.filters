@@ -36,6 +36,8 @@
     <None Include="basic.vert" />
     <None Include="rect.frag" />
     <None Include="rect.vert" />
+    <None Include="map.vert" />
+    <None Include="map.frag" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="Resources\novi-sad-map-0.jpg">

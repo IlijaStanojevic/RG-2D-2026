@@ -17,6 +17,20 @@
 int screenWidth = 1080;
 int screenHeight = 1920;
 
+
+float mapWidth = 2541.0f;
+float mapHeight = 1832.0f;
+
+
+float camX = 0.0f;
+float camY = 0.0f;
+
+float lastCamX = 0.0f;
+float lastCamY = 0.0f;
+
+float traveledDistance = 0.0f;
+
+
 float uX = 0.0f; 
 float uY = 0.0f; 
 float uS = 1.0f;
@@ -26,22 +40,24 @@ unsigned mapTexture;
 GLFWcursor* cursor;
 GLFWcursor* cursorPressed;
 
+bool rezimHodanja = true;
+
 
 void preprocessTexture(unsigned& texture, const char* filepath) {
-    texture = loadImageToTexture(filepath); // Učitavanje teksture
-    glBindTexture(GL_TEXTURE_2D, texture); // Vezujemo se za teksturu kako bismo je podesili
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-    // Generisanje mipmapa - predefinisani različiti formati za lakše skaliranje po potrebi (npr. da postoji 32 x 32 verzija slike, ali i 16 x 16, 256 x 256...)
+    texture = loadImageToTexture(filepath);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
     glGenerateMipmap(GL_TEXTURE_2D);
 
-    // Podešavanje strategija za wrap-ovanje - šta da radi kada se dimenzije teksture i poligona ne poklapaju
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // S - tekseli po x-osi
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); // T - tekseli po y-osi
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    // Podešavanje algoritma za smanjivanje i povećavanje rezolucije: nearest - bira najbliži piksel, linear - usrednjava okolne piksele
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 }
+
 
 void formVAOs() {
 
@@ -77,6 +93,7 @@ int main()
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     preprocessTexture(mapTexture, "resources/novi-sad-map-0.jpg");
+    //preprocessTexture(mapTexture, "resources/grass.png");
     cursor = loadImageToCursor("resources/bolji-compass.png");
     glfwSetCursor(window, cursor);
 
@@ -87,6 +104,10 @@ int main()
 
 
     unsigned int basicShader = createShader("basic.vert", "basic.frag");
+
+    unsigned int mapShader = createShader("map.vert", "map.frag");
+
+
 
     float vertices[] = {
          -0.2f, 0.2f, 0.0f, 0.0f, 1.0f, // gornje levo teme
@@ -144,47 +165,66 @@ int main()
 
     while (!glfwWindowShouldClose(window))
     {
-        double initFrameTime = glfwGetTime(); 
+        double initFrameTime = glfwGetTime();
+        float speed = 0.01f;
 
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) { // esc = close
+        // Camera movement (world space)
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) camY += speed;
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) camY -= speed;
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) camX -= speed;
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) camX += speed;
+
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
             break;
-        }
+
         glClear(GL_COLOR_BUFFER_BIT);
 
-
-
-        glUseProgram(basicShader); // Podešavanje da se crta koristeći dati šejder
-        glBindVertexArray(VAOnight); // Podešavanje da se crta koristeći date vertekse
-
-        // Crtaju se trouglovi, krećući se od nultog elementa u vertices i zaustavljajući se posle 3 temena
+        // Draw night triangle
+        glUseProgram(basicShader);
+        glBindVertexArray(VAOnight);
         glDrawArrays(GL_TRIANGLES, 0, 3);
-        //glBindVertexArray(VAOrect);
-        //lDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-        // 
-        // 
-        glUseProgram(rectShader);
 
-        glUniform1f(glGetUniformLocation(rectShader, "uX"), uX); // Zadatak 3
-        glUniform1f(glGetUniformLocation(rectShader, "uY"), uY); // Zadatak 2
-        glUniform1f(glGetUniformLocation(rectShader, "uS"), uS); // Zadatak 4
+        // ---------------------- MAP DRAWING ----------------------
+        glUseProgram(mapShader);
+
+        // true texture size (IMPORTANT!)
+        float texW = 2541.0f;
+        float texH = 1832.0f;
+
+        float texAspect = texW / texH;
+        float screenAspect = (float)screenWidth / screenHeight;
+
+        // Zoom level (0.0 = deepest zoom, 1.0 = whole map)
+        float zoom = 0.3f;
+
+        // Correct UV window size (fixes distortion)
+        float viewW = zoom;
+        float viewH = zoom * (screenAspect / texAspect);
+
+        // Convert camera world coords → UV coords
+        float camUvX = camX / texW;
+        float camUvY = camY / texH;
+
+        // NO CLAMPING — can go outside 0..1
+        glUniform1f(glGetUniformLocation(mapShader, "uCamX"), camUvX);
+        glUniform1f(glGetUniformLocation(mapShader, "uCamY"), camUvY);
+        glUniform1f(glGetUniformLocation(mapShader, "uViewW"), viewW);
+        glUniform1f(glGetUniformLocation(mapShader, "uViewH"), viewH);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, mapTexture);
 
-
         glBindVertexArray(VAOrect);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-
-        
 
         glfwSwapBuffers(window);
         glfwPollEvents();
 
-
-
-
-        while (glfwGetTime() - initFrameTime < 1 / 75.0) {} // fps limiter
+        while (glfwGetTime() - initFrameTime < 1 / 75.0) {}
     }
+
+
+
 
     glfwDestroyWindow(window);
     glfwTerminate();
