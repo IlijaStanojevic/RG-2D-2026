@@ -1,6 +1,7 @@
 ﻿#include <GL/glew.h>
 #include <GLFW/glfw3.h>
-
+#include <ft2build.h>
+#include FT_FREETYPE_H
 
 #define _USE_MATH_DEFINES
 #include <cmath> // za pi
@@ -9,6 +10,9 @@
 #include "../Header/Util.h"
 
 
+
+FT_Library ft;
+FT_Face face;
 
 
 
@@ -20,11 +24,30 @@ int screenHeight = 1920;
 float uX = 0.0f; 
 float uY = 0.0f; 
 float uS = 1.0f;
+float mapWidth = 2541.0f;
+float mapHeight = 1832.0f;
+float camX = 0.0f; 
+float camY = 0.0f; 
+float lastCamX = 0.0f; 
+float lastCamY = 0.0f; 
+float traveledDistance = 0.0f;
+
+
+float startX = uX;
+float startY = uY;
+float displacementDistance = 0.0f;
+
 
 unsigned mapTexture;
+unsigned pinTexture;
+unsigned indexTexture;
+unsigned cikicaTexture;
+unsigned rulerTexture;
 
 GLFWcursor* cursor;
 GLFWcursor* cursorPressed;
+
+bool rezimHodanja = true;
 
 
 void preprocessTexture(unsigned& texture, const char* filepath) {
@@ -42,6 +65,28 @@ void preprocessTexture(unsigned& texture, const char* filepath) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 }
+void center_callback(GLFWwindow* window, int button, int action, int mods) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+        // Normalizacija da bi se pozicija izražena u pikselima namapirala na OpenGL-ov prozor sa opsegom (-1, 1)
+        float xposNorm = (xpos / screenWidth) * 2 - 1;
+        float yposNorm = -((ypos / screenHeight) * 2 - 1);
+        std::cout << xposNorm << std::endl;
+        std::cout << yposNorm;
+        if (
+            xposNorm < 0.7 && xposNorm > 0.6 && // Da li je kursor između leve i desne ivice kvadrata
+            yposNorm < 1.0 && yposNorm > 0.9 // Da li je kursor između donje i gornje ivice kvadrata, sa uračunatim pomeranjem ivica u spljeskanom stanju
+            ) rezimHodanja = !rezimHodanja;
+    }
+
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
+        glfwSetCursor(window, cursor);
+    }
+}
+
+
 
 void formVAOs() {
 
@@ -60,6 +105,10 @@ int main()
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 
+
+
+
+
     // Formiranje prozora za prikaz sa datim dimenzijama i naslovom
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
     const GLFWvidmode* mode = glfwGetVideoMode(monitor);
@@ -76,14 +125,26 @@ int main()
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    preprocessTexture(mapTexture, "resources/novi-sad-map-0.jpg");
+    //preprocessTexture(mapTexture, "resources/novi-sad-map-0.jpg");
+    preprocessTexture(mapTexture, "resources/novi sad bolji.jpg");
+    preprocessTexture(pinTexture, "resources/pin.png");
+    preprocessTexture(indexTexture, "resources/crveni index.png");
+    preprocessTexture(cikicaTexture, "resources/cikica.png");
+    preprocessTexture(rulerTexture, "resources/ruler.png");
+    
     cursor = loadImageToCursor("resources/bolji-compass.png");
     glfwSetCursor(window, cursor);
 
-    unsigned int rectShader = createShader("rect.vert", "rect.frag");
-    glUseProgram(rectShader);
-    glUniform1i(glGetUniformLocation(rectShader, "uTex0"), 0);
-    glUniform1i(glGetUniformLocation(rectShader, "uTex1"), 1);
+    unsigned int textureShader = createShader("rect.vert", "rect.frag");
+    glUseProgram(textureShader);
+    glUniform1i(glGetUniformLocation(textureShader, "uTex0"), 0);
+    glUniform1i(glGetUniformLocation(textureShader, "uTex1"), 1);
+
+    unsigned int mapShader = createShader("map.vert", "map.frag");
+    glUseProgram(mapShader);
+    glUniform1i(glGetUniformLocation(mapShader, "uTex0"), 0);
+    glUniform1i(glGetUniformLocation(mapShader, "uTex1"), 1);
+
 
 
     unsigned int basicShader = createShader("basic.vert", "basic.frag");
@@ -110,9 +171,32 @@ int main()
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
+    
 
+    float walkingMap[] = {
+        // x, y,  u, v
+        -10.0f,  10.0f,   0.0f, 1.0f,   // top left
+        -10.0f, -10.0f,   0.0f, 0.0f,   // bottom left
+         10.0f, -10.0f,   1.0f, 0.0f,   // bottom right
+         10.0f,  10.0f,   1.0f, 1.0f    // top right
+    };
+    unsigned int VAOwalkingMap;
+    size_t walkingMapSize = sizeof(walkingMap);
+    unsigned int VBOwalkingMap;
+    glGenVertexArrays(1, &VAOwalkingMap);
+    glGenBuffers(1, &VBOwalkingMap);
 
-    float verticesRect[] = {
+    glBindVertexArray(VAOwalkingMap);
+    glBindBuffer(GL_ARRAY_BUFFER, VBOwalkingMap);
+    glBufferData(GL_ARRAY_BUFFER, walkingMapSize, walkingMap, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    float rulerMap[] = {
         // x, y,  u, v
         -1.0f,  1.0f,   0.0f, 1.0f,   // top left
         -1.0f, -1.0f,   0.0f, 0.0f,   // bottom left
@@ -122,15 +206,15 @@ int main()
 
 
 
-    unsigned int VAOrect;
-    size_t rectSize = sizeof(verticesRect);
-    unsigned int VBOrect;
-    glGenVertexArrays(1, &VAOrect);
-    glGenBuffers(1, &VBOrect);
+    unsigned int VAOrulerMap;
+    size_t rulerMapSize = sizeof(rulerMap);
+    unsigned int VBOrulerMap;
+    glGenVertexArrays(1, &VAOrulerMap);
+    glGenBuffers(1, &VBOrulerMap);
 
-    glBindVertexArray(VAOrect);
-    glBindBuffer(GL_ARRAY_BUFFER, VBOrect);
-    glBufferData(GL_ARRAY_BUFFER, rectSize, verticesRect, GL_STATIC_DRAW);
+    glBindVertexArray(VAOrulerMap);
+    glBindBuffer(GL_ARRAY_BUFFER, VBOrulerMap);
+    glBufferData(GL_ARRAY_BUFFER, rulerMapSize, rulerMap, GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
@@ -140,51 +224,176 @@ int main()
 
 
 
+
+
+
+    float pinVertices[] = {
+        -0.1f,  0.1f,   0.0f, 1.0f,   // top left
+        -0.1f, -0.1f,   0.0f, 0.0f,   // bottom left
+         0.1f, -0.1f,   1.0f, 0.0f,   // bottom right
+         0.1f,  0.1f,   1.0f, 1.0f    // top right
+    };
+    unsigned int VAOpin;
+    size_t pinSize = sizeof(pinVertices);
+    unsigned int VBOpin;
+    glGenVertexArrays(1, &VAOpin);
+    glGenBuffers(1, &VBOpin);
+
+    glBindVertexArray(VAOpin);
+    glBindBuffer(GL_ARRAY_BUFFER, VAOpin);
+    glBufferData(GL_ARRAY_BUFFER, pinSize, pinVertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+
+
+    float indexVertices[] = {
+        //x    y
+    0.7f,  1.0f,   0.0f, 1.0f,   // top left
+    0.7f, 0.9f,   0.0f, 0.0f,   // bottom left
+     1.0f, 0.9f,   1.0f, 0.0f,   // bottom right
+     1.0f,  1.0f,   1.0f, 1.0f    // top right
+    };
+    unsigned int VAOindex;
+    size_t indexSize = sizeof(indexVertices);
+    unsigned int VBOindex;
+    glGenVertexArrays(1, &VAOindex);
+    glGenBuffers(1, &VBOindex);
+
+    glBindVertexArray(VAOindex);
+    glBindBuffer(GL_ARRAY_BUFFER, VAOindex);
+    glBufferData(GL_ARRAY_BUFFER, pinSize, indexVertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+
+
+    float iconVertices[] = {
+        //x    y
+    0.6f,  1.0f,   0.0f, 1.0f,   // top left
+    0.6f, 0.9f,   0.0f, 0.0f,   // bottom left
+     0.7f, 0.9f,   1.0f, 0.0f,   // bottom right
+     0.7f,  1.0f,   1.0f, 1.0f    // top right
+    };
+    unsigned int VAOicon;
+    size_t iconSize = sizeof(iconVertices);
+    unsigned int VBOicon;
+    glGenVertexArrays(1, &VAOicon);
+    glGenBuffers(1, &VBOicon);
+
+    glBindVertexArray(VAOicon);
+    glBindBuffer(GL_ARRAY_BUFFER, VAOicon);
+    glBufferData(GL_ARRAY_BUFFER, pinSize, iconVertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+
     glClearColor(0.2f, 0.8f, 0.6f, 1.0f);
 
     while (!glfwWindowShouldClose(window))
     {
-        double initFrameTime = glfwGetTime(); 
+        
+        double initFrameTime = glfwGetTime();
+        float speed = 0.001f;
+        glfwSetMouseButtonCallback(window, center_callback);
+
+
 
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) { // esc = close
             break;
         }
+        if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) { // R = promena rezima
+            rezimHodanja = !rezimHodanja;
+        }
+
+
         glClear(GL_COLOR_BUFFER_BIT);
+        if (rezimHodanja) {
+            //std::cout << rezimHodanja;
+            float prevX = uX;
+            float prevY = uY;
+
+            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) uY -= speed;
+            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) uY += speed;
+            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) uX += speed;
+            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) uX -= speed;
+
+            // distancefrom start
+            float dx = uX - startX;
+            float dy = uY - startY;
+            displacementDistance = std::sqrt(dx * dx + dy * dy);
+
+
+            //draw map zoomed
+            glUseProgram(mapShader);
+            glUniform1f(glGetUniformLocation(mapShader, "uX"), uX);
+            glUniform1f(glGetUniformLocation(mapShader, "uY"), uY);
+            glUniform1f(glGetUniformLocation(mapShader, "uS"), uS);
+
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, mapTexture);
+            glBindVertexArray(VAOwalkingMap);
+            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+            //draw pin
+            glUseProgram(textureShader);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, pinTexture);
+            glBindVertexArray(VAOpin);
+            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+        }
+        else {
+            //draw regular map
+            glUseProgram(textureShader);
+
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, mapTexture);
+            glBindVertexArray(VAOrulerMap);
+            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        }
 
 
 
-        glUseProgram(basicShader); // Podešavanje da se crta koristeći dati šejder
-        glBindVertexArray(VAOnight); // Podešavanje da se crta koristeći date vertekse
-
-        // Crtaju se trouglovi, krećući se od nultog elementa u vertices i zaustavljajući se posle 3 temena
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-        //glBindVertexArray(VAOrect);
-        //lDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-        // 
-        // 
-        glUseProgram(rectShader);
-
-        glUniform1f(glGetUniformLocation(rectShader, "uX"), uX); // Zadatak 3
-        glUniform1f(glGetUniformLocation(rectShader, "uY"), uY); // Zadatak 2
-        glUniform1f(glGetUniformLocation(rectShader, "uS"), uS); // Zadatak 4
-
+        //draw index
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, mapTexture);
-
-
-        glBindVertexArray(VAOrect);
+        glBindTexture(GL_TEXTURE_2D, indexTexture);
+        glBindVertexArray(VAOindex);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
-        
+
+
+        if (rezimHodanja) {
+            glBindTexture(GL_TEXTURE_2D, cikicaTexture);
+        }else{
+            glBindTexture(GL_TEXTURE_2D, rulerTexture);
+        }
+
+
+        // draw icon
+        glActiveTexture(GL_TEXTURE0);
+        glBindVertexArray(VAOicon);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
 
         glfwSwapBuffers(window);
         glfwPollEvents();
-
-
-
-
+        //std::cout << displacementDistance;
         while (glfwGetTime() - initFrameTime < 1 / 75.0) {} // fps limiter
     }
+
 
     glfwDestroyWindow(window);
     glfwTerminate();
