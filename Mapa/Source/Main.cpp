@@ -236,11 +236,6 @@ int main()
     preprocessTexture(mapTexture, "resources/novi sad bolji.jpg");
     preprocessTexture(pinTexture, "resources/pin.png");
     preprocessTexture(indexTexture, "resources/crveni index.png");
-    int internalFormat = 0;
-    glBindTexture(GL_TEXTURE_2D, indexTexture);
-    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internalFormat);
-    std::cout << "Index texture internal format: " << internalFormat << std::endl;
-
     preprocessTexture(cikicaTexture, "resources/cikica.png");
     preprocessTexture(rulerTexture, "resources/ruler.png");
     preprocessTexture(zero_texture, "resources/0.png");
@@ -403,12 +398,12 @@ int main()
 
     float digitVertices[5][16];
 
-    float startX = -0.25f;
-    float endX = 0.25f;
+    float startX = -1.0f;
+    float endX = -0.7f;
     float width = (endX - startX) / 5.0f;   // = 0.12
 
     float topY = 1.0f;
-    float bottomY = 0.85f;
+    float bottomY = 0.9f;
 
     for (int i = 0; i < 5; i++)
     {
@@ -494,6 +489,28 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
         if (rezimHodanja) {
             //std::cout << rezimHodanja;
+            //float prevX = uX;
+            //float prevY = uY;
+
+            //if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+            //    uY -= speed;
+            //}
+            //if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+            //    uY += speed;
+            //}
+            //if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+            //{
+            //    uX += speed;
+            //}
+            //if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+            //    uX -= speed;
+            //}
+
+            //// distancefrom start
+            //float dx = uX ;
+            //float dy = uY ;
+            ////displacementDistance = std::sqrt(dx * dx + dy * dy);
+
             float prevX = uX;
             float prevY = uY;
 
@@ -502,10 +519,13 @@ int main()
             if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) uX += speed;
             if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) uX -= speed;
 
-            // distancefrom start
-            float dx = uX ;
-            float dy = uY ;
-            displacementDistance = std::sqrt(dx * dx + dy * dy);
+            // Measure per-frame 
+            float frameDX = uX - prevX;
+            float frameDY = uY - prevY;
+            float frameDist = sqrt(frameDX * frameDX + frameDY * frameDY);
+
+            displacementDistance += frameDist;
+
 
 
             //draw map zoomed
