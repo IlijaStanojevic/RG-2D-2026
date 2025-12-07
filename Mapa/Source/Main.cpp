@@ -167,20 +167,16 @@ void mouse_click_callback(GLFWwindow* window, int button, int action, int mods)
     double xpos, ypos;
     glfwGetCursorPos(window, &xpos, &ypos);
 
-    // Convert screen (0..width, 0..height) → NDC (-1..1)
     float x = (xpos / screenWidth) * 2.0f - 1.0f;
     float y = 1.0f - (ypos / screenHeight) * 2.0f;
 
-    // Toggle mode (your original logic)
     if (x < 0.7 && x > 0.6 && y < 1.0 && y > 0.9) {
         rezimHodanja = !rezimHodanja;
         return;
     }
 
-    // ---- Measurement mode actions ----
     if (!rezimHodanja)
     {
-        // First check if click is near a point → delete
         const float DELETE_RADIUS = 0.02f;
 
         for (int i = 0; i < measurePoints.size(); i++)
@@ -193,7 +189,6 @@ void mouse_click_callback(GLFWwindow* window, int button, int action, int mods)
             }
         }
 
-        // Otherwise add a new point
         addMeasurePoint(x, y);
     }
 }
@@ -216,8 +211,6 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glPointSize(40.0f);
-    glLineWidth(4000.0f);
 
 
 
@@ -243,6 +236,11 @@ int main()
     preprocessTexture(mapTexture, "resources/novi sad bolji.jpg");
     preprocessTexture(pinTexture, "resources/pin.png");
     preprocessTexture(indexTexture, "resources/crveni index.png");
+    int internalFormat = 0;
+    glBindTexture(GL_TEXTURE_2D, indexTexture);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internalFormat);
+    std::cout << "Index texture internal format: " << internalFormat << std::endl;
+
     preprocessTexture(cikicaTexture, "resources/cikica.png");
     preprocessTexture(rulerTexture, "resources/ruler.png");
     preprocessTexture(zero_texture, "resources/0.png");
@@ -273,27 +271,7 @@ int main()
 
     unsigned int basicShader = createShader("basic.vert", "basic.frag");
 
-    float vertices[] = {
-         -0.2f, 0.2f, 0.0f, 0.0f, 1.0f, // gornje levo teme
-         -0.2f, -0.2f, 0.0f, 1.0f, 0.0f, // donje levo teme
-         0.2f, -0.2f, 1.0f, 0.0f, 0.0f, // donje desno teme
-    };
-    unsigned int VAOnight;
-    size_t nightSize = sizeof(vertices);
-    unsigned int VBOnight;
-    glGenVertexArrays(1, &VAOnight);
-    glGenBuffers(1, &VBOnight);
-
-    glBindVertexArray(VAOnight);
-    glBindBuffer(GL_ARRAY_BUFFER, VBOnight);
-    glBufferData(GL_ARRAY_BUFFER, nightSize, vertices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    // Atribut 1 (boja):
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    glEnableVertexAttribArray(1);
+    
 
 
 
@@ -534,7 +512,6 @@ int main()
             glUseProgram(mapShader);
             glUniform1f(glGetUniformLocation(mapShader, "uX"), uX);
             glUniform1f(glGetUniformLocation(mapShader, "uY"), uY);
-            glUniform1f(glGetUniformLocation(mapShader, "uS"), uS);
 
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, mapTexture);
@@ -562,19 +539,18 @@ int main()
 
             float dist = displacementDistance;
 
-            // prepare array of 5 digit indices (0–9)
             int displayDigits[5];
 
-            // ---- integer part (first 3 digits) ----
-            int d = (int)(dist * 100.0f);  // shift decimals so we can extract easily
+            
+            int d = (int)(dist * 100.0f);  
 
-            int digit0 = (d / 100000) % 10;  // thousands
-            int digit1 = (d / 10000) % 10;  // thousands
-            int digit2 = (d / 1000) % 10;  // hundreds
-            int digit3 = (d / 100) % 10;  // tens
+            int digit0 = (d / 100000) % 10;  // deset hiljada
+            int digit1 = (d / 10000) % 10;  // hiljada
+            int digit2 = (d / 1000) % 10;  // sto
+            int digit3 = (d / 100) % 10;  // deset
 
-            // ---- first 2 decimal digits ----
-            int firstDecimal = ((int)(dist * 10)) % 10;   // tenths
+            
+            int firstDecimal = ((int)(dist * 10)) % 10;   // decimala
 
             displayDigits[0] = digit0;
             displayDigits[1] = digit1;
@@ -615,11 +591,10 @@ int main()
             glBindVertexArray(VAOrulerMap);
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
-            // Draw white measurement lines
             drawMeasureLines(lineShader);
             drawMeasureDots(lineShader);
 
-            // Draw total measured distance (same digit system as walking)
+            // Draw total measured distance 
             float dist = totalMeasureDistance;
 
             int displayDigits[5];
