@@ -583,7 +583,6 @@ int main()
             for (int i = 0; i < 5; i++)
             {
                 int d = displayDigits[i];  // the digit to show (0–9)
-
                 glBindTexture(GL_TEXTURE_2D, digitTextures[d]);
 
                 glBindVertexArray(digitVAO[i]);
