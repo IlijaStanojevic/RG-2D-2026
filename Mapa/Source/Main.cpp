@@ -10,6 +10,9 @@
 #include "../Header/Util.h"
 #include <vector>
 
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 
 FT_Library ft;
@@ -56,7 +59,11 @@ unsigned eight_texture;
 unsigned nine_texture;
 
 
-
+float camYaw = 0.0f;        // left/right
+float camPitch = 0.0f;      // tilt (radians)
+float camDist = 10.0f;      // zoom
+glm::vec3 camTarget(0, 0, 0); // map center
+float camSpeed = 0.1f;
 
 
 GLFWcursor* cursor;
@@ -232,6 +239,10 @@ int main()
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+
     //preprocessTexture(mapTexture, "resources/novi-sad-map-0.jpg");
     preprocessTexture(mapTexture, "resources/novi sad bolji.jpg");
     preprocessTexture(pinTexture, "resources/pin.png");
@@ -266,16 +277,16 @@ int main()
 
     unsigned int basicShader = createShader("basic.vert", "basic.frag");
 
-    
+
 
 
 
     float walkingMap[] = {
         // x, y,  u, v
-        -10.0f,  10.0f,   0.0f, 1.0f,   // top left
-        -10.0f, -10.0f,   0.0f, 0.0f,   // bottom left
-         10.0f, -10.0f,   1.0f, 0.0f,   // bottom right
-         10.0f,  10.0f,   1.0f, 1.0f    // top right
+        -10.0f,  10.0f, 0.0f,   0.0f, 1.0f,   // top left
+        -10.0f, -10.0f, 0.0f,   0.0f, 0.0f,   // bottom left
+         10.0f, -10.0f, 0.0f,   1.0f, 0.0f,   // bottom right
+         10.0f,  10.0f, 0.0f,   1.0f, 1.0f    // top right
     };
     unsigned int VAOwalkingMap;
     size_t walkingMapSize = sizeof(walkingMap);
@@ -287,10 +298,10 @@ int main()
     glBindBuffer(GL_ARRAY_BUFFER, VBOwalkingMap);
     glBufferData(GL_ARRAY_BUFFER, walkingMapSize, walkingMap, GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
     float rulerMap[] = {
@@ -471,10 +482,22 @@ int main()
 
     while (!glfwWindowShouldClose(window))
     {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         double initFrameTime = glfwGetTime();
         float speed = 0.001f;
         glfwSetMouseButtonCallback(window, mouse_click_callback);
+
+        glm::vec3 camPos;
+        camPos.x = camTarget.x + camDist * cos(camPitch) * sin(camYaw);
+        camPos.y = camTarget.y + camDist * sin(camPitch);
+        camPos.z = camTarget.z + camDist * cos(camPitch) * cos(camYaw);
+
+
+
+        glm::mat4 view = glm::lookAt(camPos, camTarget, glm::vec3(0, 1, 0));
+        glm::mat4 proj = glm::perspective(glm::radians(60.0f), screenWidth / (float)screenHeight, 0.1f, 500.0f);
+        glm::mat4 model = glm::mat4(1.0f);
 
 
 
@@ -488,36 +511,30 @@ int main()
 
         glClear(GL_COLOR_BUFFER_BIT);
         if (rezimHodanja) {
-            //std::cout << rezimHodanja;
-            //float prevX = uX;
-            //float prevY = uY;
-
-            //if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-            //    uY -= speed;
-            //}
-            //if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-            //    uY += speed;
-            //}
-            //if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-            //{
-            //    uX += speed;
-            //}
-            //if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-            //    uX -= speed;
-            //}
-
-            //// distancefrom start
-            //float dx = uX ;
-            //float dy = uY ;
-            ////displacementDistance = std::sqrt(dx * dx + dy * dy);
-
             float prevX = uX;
             float prevY = uY;
 
-            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) uY -= speed;
-            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) uY += speed;
-            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) uX += speed;
-            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) uX -= speed;
+            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+                camTarget.y += camSpeed;
+
+            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+                camTarget.y -= camSpeed;
+
+            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+                camTarget.x -= camSpeed;
+
+            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+                camTarget.x += camSpeed;
+
+
+            if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+                camPitch += camSpeed / 10;
+            if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+                camPitch -= camSpeed / 10;
+            if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+                camYaw -= camSpeed / 10;
+            if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+                camYaw += camSpeed / 10;
 
             // Measure per-frame 
             float frameDX = uX - prevX;
@@ -530,8 +547,9 @@ int main()
 
             //draw map zoomed
             glUseProgram(mapShader);
-            glUniform1f(glGetUniformLocation(mapShader, "uX"), uX);
-            glUniform1f(glGetUniformLocation(mapShader, "uY"), uY);
+            glUniformMatrix4fv(glGetUniformLocation(mapShader, "uModel"), 1, GL_FALSE, &model[0][0]);
+            glUniformMatrix4fv(glGetUniformLocation(mapShader, "uView"), 1, GL_FALSE, &view[0][0]);
+            glUniformMatrix4fv(glGetUniformLocation(mapShader, "uProj"), 1, GL_FALSE, &proj[0][0]);
 
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, mapTexture);
@@ -669,6 +687,8 @@ int main()
         glfwPollEvents();
         //std::cout << displacementDistance;
         while (glfwGetTime() - initFrameTime < 1 / 75.0) {} // fps limiter
+
+        
     }
 
 
