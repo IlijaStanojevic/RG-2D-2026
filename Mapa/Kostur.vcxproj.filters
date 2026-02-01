@@ -29,6 +29,15 @@
     <ClInclude Include="Header\Util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="shader.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mesh.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="model.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -42,6 +51,14 @@
     <None Include="text.frag" />
     <None Include="line.vert" />
     <None Include="line.frag" />
+    <None Include="model.vert" />
+    <None Include="model.frag" />
+    <None Include="Resources\low-poly-fox.mtl">
+      <Filter>resources</Filter>
+    </None>
+    <None Include="Resources\humanoid.mtl">
+      <Filter>resources</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Image Include="Resources\novi-sad-map-0.jpg">
@@ -104,5 +121,19 @@
     <Image Include="Resources\9.png">
       <Filter>resources</Filter>
     </Image>
+    <Image Include="Resources\texture.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="Resources\Texture.0.1.png">
+      <Filter>resources</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <Object Include="Resources\low-poly-fox.obj">
+      <Filter>resources</Filter>
+    </Object>
+    <Object Include="Resources\humanoid.obj">
+      <Filter>resources</Filter>
+    </Object>
   </ItemGroup>
 </Project>

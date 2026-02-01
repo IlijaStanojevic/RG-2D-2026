@@ -131,6 +131,9 @@
     <ClCompile Include="Source\Util.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="mesh.hpp" />
+    <ClInclude Include="model.hpp" />
+    <ClInclude Include="shader.hpp" />
     <ClInclude Include="Header\stb_image.h" />
     <ClInclude Include="Header\Util.h" />
   </ItemGroup>
@@ -141,9 +144,13 @@
     <None Include="line.vert" />
     <None Include="map.frag" />
     <None Include="map.vert" />
+    <None Include="model.frag" />
+    <None Include="model.vert" />
     <None Include="packages.config" />
     <None Include="rect.frag" />
     <None Include="rect.vert" />
+    <None Include="Resources\humanoid.mtl" />
+    <None Include="Resources\low-poly-fox.mtl" />
     <None Include="text.frag" />
     <None Include="text.vert" />
   </ItemGroup>
@@ -168,6 +175,16 @@
     <Image Include="Resources\novi-sad-map-0.jpg" />
     <Image Include="Resources\pin.png" />
     <Image Include="Resources\ruler.png" />
+    <Image Include="Resources\Texture.0.1.png" />
+    <Image Include="Resources\texture.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Object Include="Resources\humanoid.obj">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </Object>
+    <Object Include="Resources\low-poly-fox.obj">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </Object>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
@@ -176,6 +193,8 @@
     <Import Project="packages\freetype.redist.2.8.0.1\build\native\freetype.redist.targets" Condition="Exists('packages\freetype.redist.2.8.0.1\build\native\freetype.redist.targets')" />
     <Import Project="packages\freetype.2.8.0.1\build\native\freetype.targets" Condition="Exists('packages\freetype.2.8.0.1\build\native\freetype.targets')" />
     <Import Project="packages\glm.1.0.3\build\native\glm.targets" Condition="Exists('packages\glm.1.0.3\build\native\glm.targets')" />
+    <Import Project="packages\Assimp.redist.3.0.0\build\native\Assimp.redist.targets" Condition="Exists('packages\Assimp.redist.3.0.0\build\native\Assimp.redist.targets')" />
+    <Import Project="packages\Assimp.3.0.0\build\native\Assimp.targets" Condition="Exists('packages\Assimp.3.0.0\build\native\Assimp.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -186,5 +205,7 @@
     <Error Condition="!Exists('packages\freetype.redist.2.8.0.1\build\native\freetype.redist.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\freetype.redist.2.8.0.1\build\native\freetype.redist.targets'))" />
     <Error Condition="!Exists('packages\freetype.2.8.0.1\build\native\freetype.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\freetype.2.8.0.1\build\native\freetype.targets'))" />
     <Error Condition="!Exists('packages\glm.1.0.3\build\native\glm.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\glm.1.0.3\build\native\glm.targets'))" />
+    <Error Condition="!Exists('packages\Assimp.redist.3.0.0\build\native\Assimp.redist.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Assimp.redist.3.0.0\build\native\Assimp.redist.targets'))" />
+    <Error Condition="!Exists('packages\Assimp.3.0.0\build\native\Assimp.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Assimp.3.0.0\build\native\Assimp.targets'))" />
   </Target>
 </Project>

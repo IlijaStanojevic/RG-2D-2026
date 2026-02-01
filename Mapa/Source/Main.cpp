@@ -15,6 +15,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
 
+
+#include "../shader.hpp"
+#include "../model.hpp"
+
 FT_Library ft;
 FT_Face face;
 
@@ -514,7 +518,8 @@ int main()
     glBindVertexArray(0);
 
 
-
+    Model humanoid("resources/humanoid.obj");
+    Shader unifiedShader("model.vert", "model.frag");
 
 
 
@@ -663,23 +668,23 @@ int main()
 
 ;
 
-            glUseProgram(basicShader);
+            //glUseProgram(basicShader);
 
-            // Send matrices
-            glUniformMatrix4fv(glGetUniformLocation(basicShader, "uModel"), 1, GL_FALSE, &model[0][0]);
-            glUniformMatrix4fv(glGetUniformLocation(basicShader, "uView"), 1, GL_FALSE, &view[0][0]);
-            glUniformMatrix4fv(glGetUniformLocation(basicShader, "uProj"), 1, GL_FALSE, &proj[0][0]);
+            //// Send matrices
+            //glUniformMatrix4fv(glGetUniformLocation(basicShader, "uModel"), 1, GL_FALSE, &model[0][0]);
+            //glUniformMatrix4fv(glGetUniformLocation(basicShader, "uView"), 1, GL_FALSE, &view[0][0]);
+            //glUniformMatrix4fv(glGetUniformLocation(basicShader, "uProj"), 1, GL_FALSE, &proj[0][0]);
 
-            // Optional: give it its own model transform (recommended)
-            glm::mat4 cubeModel = glm::mat4(1.0f);
-            cubeModel = glm::translate(cubeModel, glm::vec3(0.0f, 0.0f, 0.0f));
-            // cubeModel = glm::rotate(cubeModel, (float)glfwGetTime(), glm::vec3(0, 1, 0));
-            glUniformMatrix4fv(glGetUniformLocation(basicShader, "uModel"), 1, GL_FALSE, &cubeModel[0][0]);
+            ////// Optional: give it its own model transform (recommended)
+            ////glm::mat4 cubeModel = glm::mat4(1.0f);
+            ////cubeModel = glm::translate(cubeModel, glm::vec3(0.0f, 0.0f, 0.0f));
+            ////// cubeModel = glm::rotate(cubeModel, (float)glfwGetTime(), glm::vec3(0, 1, 0));
+            ////glUniformMatrix4fv(glGetUniformLocation(basicShader, "uModel"), 1, GL_FALSE, &cubeModel[0][0]);
 
-            // Draw
-            glBindVertexArray(VAOcube);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-            glBindVertexArray(0);
+            //// Draw
+            //glBindVertexArray(VAOcube);
+            //glDrawArrays(GL_TRIANGLES, 0, 36);
+            //glBindVertexArray(0);
 
         }
         else {
@@ -729,6 +734,19 @@ int main()
         glBindTexture(GL_TEXTURE_2D, indexTexture);
         glBindVertexArray(VAOindex);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+
+
+        unifiedShader.use();
+        unifiedShader.setVec3("uLightPos", 0.0f, 20.0f, 3.0f);
+        unifiedShader.setVec3("uLightColor", 1.0f, 1.0f, 1.0f);
+        unifiedShader.setMat4("uP", proj);
+        unifiedShader.setMat4("uV", view);
+        model = glm::scale(model, glm::vec3(0.1f));
+        model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1, 0, 0));
+        unifiedShader.setMat4("uM", model);
+
+        humanoid.Draw(unifiedShader);
 
 
 
