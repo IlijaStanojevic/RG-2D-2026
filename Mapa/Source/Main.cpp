@@ -13,7 +13,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-
+#include <algorithm>
 
 FT_Library ft;
 FT_Face face;
@@ -61,7 +61,7 @@ unsigned nine_texture;
 
 float camYaw = 0.0f;        // left/right
 float camPitch = 0.0f;      // tilt (radians)
-float camDist = 10.0f;      // zoom
+float camDist = 3.0f;      // zoom
 glm::vec3 camTarget(0, 0, 0); // map center
 float camSpeed = 0.1f;
 
@@ -335,27 +335,74 @@ int main()
 
 
 
-    float pinVertices[] = {
-        -0.1f,  0.1f,   0.0f, 1.0f,   // top left
-        -0.1f, -0.1f,   0.0f, 0.0f,   // bottom left
-         0.1f, -0.1f,   1.0f, 0.0f,   // bottom right
-         0.1f,  0.1f,   1.0f, 1.0f    // top right
+    float cubeVertices[] = {
+        // pos                 // color (red)
+        // FRONT (+Z)
+        -0.1f,-0.1f, 0.1f,      1,0,0,
+         0.1f,-0.1f, 0.1f,      1,0,0,
+         0.1f, 0.1f, 0.1f,      1,0,0,
+         0.1f, 0.1f, 0.1f,      1,0,0,
+        -0.1f, 0.1f, 0.1f,      1,0,0,
+        -0.1f,-0.1f, 0.1f,      1,0,0,
+
+        // BACK (-Z)
+        -0.1f,-0.1f,-0.1f,      1,0,0,
+        -0.1f, 0.1f,-0.1f,      1,0,0,
+         0.1f, 0.1f,-0.1f,      1,0,0,
+         0.1f, 0.1f,-0.1f,      1,0,0,
+         0.1f,-0.1f,-0.1f,      1,0,0,
+        -0.1f,-0.1f,-0.1f,      1,0,0,
+
+        // LEFT (-X)
+        -0.1f, 0.1f, 0.1f,      1,0,0,
+        -0.1f, 0.1f,-0.1f,      1,0,0,
+        -0.1f,-0.1f,-0.1f,      1,0,0,
+        -0.1f,-0.1f,-0.1f,      1,0,0,
+        -0.1f,-0.1f, 0.1f,      1,0,0,
+        -0.1f, 0.1f, 0.1f,      1,0,0,
+
+        // RIGHT (+X)
+         0.1f, 0.1f, 0.1f,      1,0,0,
+         0.1f, 0.1f,-0.1f,      1,0,0,
+         0.1f,-0.1f,-0.1f,      1,0,0,
+         0.1f,-0.1f,-0.1f,      1,0,0,
+         0.1f,-0.1f, 0.1f,      1,0,0,
+         0.1f, 0.1f, 0.1f,      1,0,0,
+
+         // TOP (+Y)
+         -0.1f, 0.1f,-0.1f,      1,0,0,
+          0.1f, 0.1f,-0.1f,      1,0,0,
+          0.1f, 0.1f, 0.1f,      1,0,0,
+          0.1f, 0.1f, 0.1f,      1,0,0,
+         -0.1f, 0.1f, 0.1f,      1,0,0,
+         -0.1f, 0.1f,-0.1f,      1,0,0,
+
+         // BOTTOM (-Y)
+         -0.1f,-0.1f,-0.1f,      1,0,0,
+         -0.1f,-0.1f, 0.1f,      1,0,0,
+          0.1f,-0.1f, 0.1f,      1,0,0,
+          0.1f,-0.1f, 0.1f,      1,0,0,
+          0.1f,-0.1f,-0.1f,      1,0,0,
+         -0.1f,-0.1f,-0.1f,      1,0,0,
     };
-    unsigned int VAOpin;
-    size_t pinSize = sizeof(pinVertices);
-    unsigned int VBOpin;
-    glGenVertexArrays(1, &VAOpin);
-    glGenBuffers(1, &VBOpin);
+    unsigned int VAOcube, VBOcube;
+    glGenVertexArrays(1, &VAOcube);
+    glGenBuffers(1, &VBOcube);
 
-    glBindVertexArray(VAOpin);
-    glBindBuffer(GL_ARRAY_BUFFER, VAOpin);
-    glBufferData(GL_ARRAY_BUFFER, pinSize, pinVertices, GL_STATIC_DRAW);
+    glBindVertexArray(VAOcube);
 
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glBindBuffer(GL_ARRAY_BUFFER, VBOcube);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
+
+    // location 0: position (vec3)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    // location 1: color (vec3)
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
 
 
 
@@ -374,7 +421,7 @@ int main()
 
     glBindVertexArray(VAOindex);
     glBindBuffer(GL_ARRAY_BUFFER, VAOindex);
-    glBufferData(GL_ARRAY_BUFFER, pinSize, indexVertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, indexSize, indexVertices, GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
@@ -399,7 +446,7 @@ int main()
 
     glBindVertexArray(VAOicon);
     glBindBuffer(GL_ARRAY_BUFFER, VAOicon);
-    glBufferData(GL_ARRAY_BUFFER, pinSize, iconVertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, iconSize, iconVertices, GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
@@ -535,7 +582,10 @@ int main()
                 camYaw -= camSpeed / 10;
             if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
                 camYaw += camSpeed / 10;
-
+            //if (camPitch < -1.5f) camPitch = -1.5f;
+            //if (camPitch > 1.5f) camPitch = 1.5f;
+            //if (camYaw < -1.5f) camYaw = -1.5f;
+            //if (camYaw > 1.5f) camYaw = 1.5f;
             // Measure per-frame 
             float frameDX = uX - prevX;
             float frameDY = uY - prevY;
@@ -611,13 +661,25 @@ int main()
 
 
 
+;
 
-            //draw pin
-            glUseProgram(textureShader);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, pinTexture);
-            glBindVertexArray(VAOpin);
-            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+            glUseProgram(basicShader);
+
+            // Send matrices
+            glUniformMatrix4fv(glGetUniformLocation(basicShader, "uModel"), 1, GL_FALSE, &model[0][0]);
+            glUniformMatrix4fv(glGetUniformLocation(basicShader, "uView"), 1, GL_FALSE, &view[0][0]);
+            glUniformMatrix4fv(glGetUniformLocation(basicShader, "uProj"), 1, GL_FALSE, &proj[0][0]);
+
+            // Optional: give it its own model transform (recommended)
+            glm::mat4 cubeModel = glm::mat4(1.0f);
+            cubeModel = glm::translate(cubeModel, glm::vec3(0.0f, 0.0f, 0.0f));
+            // cubeModel = glm::rotate(cubeModel, (float)glfwGetTime(), glm::vec3(0, 1, 0));
+            glUniformMatrix4fv(glGetUniformLocation(basicShader, "uModel"), 1, GL_FALSE, &cubeModel[0][0]);
+
+            // Draw
+            glBindVertexArray(VAOcube);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+            glBindVertexArray(0);
 
         }
         else {
@@ -662,6 +724,7 @@ int main()
 
 
         //draw index
+        glUseProgram(textureShader);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, indexTexture);
         glBindVertexArray(VAOindex);
