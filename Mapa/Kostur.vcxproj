@@ -174,7 +174,7 @@
     <Image Include="Resources\novi sad bolji.jpg" />
     <Image Include="Resources\novi-sad-map-0.jpg" />
     <Image Include="Resources\pin.png" />
-    <Image Include="Resources\ruler.png" />
+    <Image Include="Resources\pin_texture.png" />
     <Image Include="Resources\Texture.0.1.png" />
     <Image Include="Resources\texture.png" />
   </ItemGroup>

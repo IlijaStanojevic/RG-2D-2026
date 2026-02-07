@@ -64,10 +64,17 @@ unsigned nine_texture;
 
 
 float camYaw = 0.0f;        // left/right
-float camPitch = 0.0f;      // tilt (radians)
+float camPitch = -0.3f;      // tilt (radians)
 float camDist = 3.0f;      // zoom
 glm::vec3 camTarget(0, 0, 0); // map center
-float camSpeed = 0.1f;
+float camSpeed = 0.01f;
+
+
+glm::vec3 humanoidPos = glm::vec3(0.0f, 0.0f, 0.0f);
+float humanoidYaw = 0.0f;
+float moveSpeed = 1.0f; 
+
+
 
 
 GLFWcursor* cursor;
@@ -563,40 +570,51 @@ int main()
 
         glClear(GL_COLOR_BUFFER_BIT);
         if (rezimHodanja) {
-            float prevX = uX;
-            float prevY = uY;
+            glm::vec3 prevHumanoidPos = humanoidPos;  // previous location
 
-            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+            static float lastTime = glfwGetTime();
+            float currentTime = glfwGetTime();
+            float dt = currentTime - lastTime;
+            lastTime = currentTime;
+
+            float step = moveSpeed * dt;
+
+            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+                humanoidPos.y += step;      
+                humanoidYaw = 180.0f;
+            }
+            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+                humanoidPos.y -= step;
+                humanoidYaw = 0.0f;
+            }
+            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+                humanoidPos.x -= step;
+                humanoidYaw = -90.0f;
+            }
+            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+                humanoidPos.x += step;
+                humanoidYaw = 90.0f;
+            }
+            if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
                 camTarget.y += camSpeed;
 
-            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+            if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
                 camTarget.y -= camSpeed;
 
-            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+            if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
                 camTarget.x -= camSpeed;
 
-            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-                camTarget.x += camSpeed;
-
-
-            if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-                camPitch += camSpeed / 10;
-            if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-                camPitch -= camSpeed / 10;
-            if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
-                camYaw -= camSpeed / 10;
             if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-                camYaw += camSpeed / 10;
-            //if (camPitch < -1.5f) camPitch = -1.5f;
-            //if (camPitch > 1.5f) camPitch = 1.5f;
-            //if (camYaw < -1.5f) camYaw = -1.5f;
-            //if (camYaw > 1.5f) camYaw = 1.5f;
-            // Measure per-frame 
-            float frameDX = uX - prevX;
-            float frameDY = uY - prevY;
-            float frameDist = sqrt(frameDX * frameDX + frameDY * frameDY);
+                camTarget.x += camSpeed;
+            // ---- distance this frame ----
+            glm::vec3 delta = humanoidPos - prevHumanoidPos;
 
-            displacementDistance += frameDist;
+            // if you want 2D distance, ignore vertical axis
+            // (if your "up" axis is Z instead, ignore that one instead)
+            delta.z = 0.0f;
+
+            displacementDistance += glm::length(delta);
+
 
 
 
@@ -742,8 +760,18 @@ int main()
         unifiedShader.setVec3("uLightColor", 1.0f, 1.0f, 1.0f);
         unifiedShader.setMat4("uP", proj);
         unifiedShader.setMat4("uV", view);
-        model = glm::scale(model, glm::vec3(0.1f));
+
+
+        // MOVE
+        model = glm::translate(model, humanoidPos);
+
+        // ORIENT (stand upright)
         model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1, 0, 0));
+        // FACING
+        model = glm::rotate(model, glm::radians(humanoidYaw), glm::vec3(0, 1, 0));
+        // SCALE
+        model = glm::scale(model, glm::vec3(0.1f));
+
         unifiedShader.setMat4("uM", model);
 
         humanoid.Draw(unifiedShader);

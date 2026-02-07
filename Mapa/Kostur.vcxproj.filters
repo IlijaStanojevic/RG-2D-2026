@@ -85,9 +85,6 @@
     <Image Include="Resources\cikica.png">
       <Filter>resources</Filter>
     </Image>
-    <Image Include="Resources\ruler.png">
-      <Filter>resources</Filter>
-    </Image>
     <Image Include="Resources\novi sad bolji.jpg">
       <Filter>resources</Filter>
     </Image>
@@ -125,6 +122,9 @@
       <Filter>resources</Filter>
     </Image>
     <Image Include="Resources\Texture.0.1.png">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="Resources\pin_texture.png">
       <Filter>resources</Filter>
     </Image>
   </ItemGroup>
