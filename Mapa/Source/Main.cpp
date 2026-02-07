@@ -75,6 +75,10 @@ float humanoidYaw = 0.0f;
 float moveSpeed = 1.0f; 
 
 
+bool depthEnabled = true;
+bool cullEnabled = false;  
+bool keyDepthPrev = false;
+bool keyCullPrev = false;
 
 
 GLFWcursor* cursor;
@@ -252,6 +256,10 @@ int main()
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
+
+    glDisable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
 
 
     //preprocessTexture(mapTexture, "resources/novi-sad-map-0.jpg");
@@ -566,7 +574,21 @@ int main()
         if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) { // R = promena rezima
             rezimHodanja = !rezimHodanja;
         }
+        bool k1 = glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS;
+        if (k1 && !keyDepthPrev) {
+            depthEnabled = !depthEnabled;
+            if (depthEnabled) glEnable(GL_DEPTH_TEST);
+            else glDisable(GL_DEPTH_TEST);
+        }
+        keyDepthPrev = k1;
 
+        bool k2 = glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS;
+        if (k2 && !keyCullPrev) {
+            cullEnabled = !cullEnabled;
+            if (cullEnabled) glEnable(GL_CULL_FACE);
+            else glDisable(GL_CULL_FACE);
+        }
+        keyCullPrev = k2;
 
         glClear(GL_COLOR_BUFFER_BIT);
         if (rezimHodanja) {
@@ -754,14 +776,12 @@ int main()
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
 
-
+        // draw humanoid
         unifiedShader.use();
         unifiedShader.setVec3("uLightPos", 0.0f, 20.0f, 3.0f);
         unifiedShader.setVec3("uLightColor", 1.0f, 1.0f, 1.0f);
         unifiedShader.setMat4("uP", proj);
         unifiedShader.setMat4("uV", view);
-
-
         // MOVE
         model = glm::translate(model, humanoidPos);
 
@@ -771,9 +791,7 @@ int main()
         model = glm::rotate(model, glm::radians(humanoidYaw), glm::vec3(0, 1, 0));
         // SCALE
         model = glm::scale(model, glm::vec3(0.1f));
-
         unifiedShader.setMat4("uM", model);
-
         humanoid.Draw(unifiedShader);
 
 
@@ -787,6 +805,7 @@ int main()
 
 
         // draw icon
+        glUseProgram(textureShader);
         glActiveTexture(GL_TEXTURE0);
         glBindVertexArray(VAOicon);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
