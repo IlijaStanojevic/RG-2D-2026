@@ -67,7 +67,7 @@ float camYaw = 0.0f;        // left/right
 float camPitch = -0.3f;      // tilt (radians)
 float camDist = 3.0f;      // zoom
 glm::vec3 camTarget(0, 0, 0); // map center
-float camSpeed = 0.01f;
+float camSpeed = 0.1f;
 
 
 glm::vec3 humanoidPos = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -79,6 +79,11 @@ bool depthEnabled = true;
 bool cullEnabled = false;  
 bool keyDepthPrev = false;
 bool keyCullPrev = false;
+
+
+glm::vec3 lightPos = glm::vec3(0.0f, 9.0f, 2.0f);
+glm::vec3 lightColor = glm::vec3(0.6f, 0.6f, 0.6f);
+
 
 
 GLFWcursor* cursor;
@@ -592,6 +597,7 @@ int main()
 
         glClear(GL_COLOR_BUFFER_BIT);
         if (rezimHodanja) {
+
             glm::vec3 prevHumanoidPos = humanoidPos;  // previous location
 
             static float lastTime = glfwGetTime();
@@ -628,11 +634,22 @@ int main()
 
             if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
                 camTarget.x += camSpeed;
-            // ---- distance this frame ----
-            glm::vec3 delta = humanoidPos - prevHumanoidPos;
 
-            // if you want 2D distance, ignore vertical axis
-            // (if your "up" axis is Z instead, ignore that one instead)
+            // X bounds
+            if (camTarget.x < -7.0f)
+                camTarget.x = -7.0f;
+
+            if (camTarget.x > 7.0f)
+                camTarget.x = 7.0f;
+
+            if (camTarget.y < -8.0f)
+                camTarget.y = -8.0f;
+
+            if (camTarget.y > 8.0f)
+                camTarget.y = 8.0f;
+
+
+            glm::vec3 delta = humanoidPos - prevHumanoidPos;
             delta.z = 0.0f;
 
             displacementDistance += glm::length(delta);
@@ -642,16 +659,39 @@ int main()
 
             //draw map zoomed
             glUseProgram(mapShader);
+
             glUniformMatrix4fv(glGetUniformLocation(mapShader, "uModel"), 1, GL_FALSE, &model[0][0]);
             glUniformMatrix4fv(glGetUniformLocation(mapShader, "uView"), 1, GL_FALSE, &view[0][0]);
             glUniformMatrix4fv(glGetUniformLocation(mapShader, "uProj"), 1, GL_FALSE, &proj[0][0]);
 
+            glUniform3fv(glGetUniformLocation(mapShader, "uLightPos"), 1, &lightPos[0]);
+            glUniform3fv(glGetUniformLocation(mapShader, "uLightColor"), 1, &lightColor[0]);
+
+            glUniform1i(glGetUniformLocation(mapShader, "uTex0"), 0);
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, mapTexture);
+
             glBindVertexArray(VAOwalkingMap);
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
 
+            // draw humanoid
+            unifiedShader.use();
+            unifiedShader.setVec3("uLightPos", lightPos);
+            unifiedShader.setVec3("uLightColor", lightColor);
+            unifiedShader.setMat4("uP", proj);
+            unifiedShader.setMat4("uV", view);
+            // MOVE
+            model = glm::translate(model, humanoidPos);
+
+            // ORIENT (stand upright)
+            model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1, 0, 0));
+            // FACING
+            model = glm::rotate(model, glm::radians(humanoidYaw), glm::vec3(0, 1, 0));
+            // SCALE
+            model = glm::scale(model, glm::vec3(0.1f));
+            unifiedShader.setMat4("uM", model);
+            humanoid.Draw(unifiedShader);
 
             unsigned int digitTextures[10] = {
                 zero_texture,
@@ -729,10 +769,51 @@ int main()
         }
         else {
             // Draw full map
-            glUseProgram(textureShader);
+            //draw map zoomed
+            camDist = 8.f;
+            if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+                camTarget.y += camSpeed;
+
+            if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+                camTarget.y -= camSpeed;
+
+            if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+                camTarget.x -= camSpeed;
+
+            if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+                camTarget.x += camSpeed;
+
+            // X bounds
+            if (camTarget.x < -2.0f)
+                camTarget.x = -2.0f;
+
+            if (camTarget.x > 2.0f)
+                camTarget.x = 2.0f;
+
+            if (camTarget.y < -4.0f)
+                camTarget.y = -4.0f;
+
+            if (camTarget.y > 4.0f)
+                camTarget.y = 4.0f;
+
+
+
+
+
+            glUseProgram(mapShader);
+
+            glUniformMatrix4fv(glGetUniformLocation(mapShader, "uModel"), 1, GL_FALSE, &model[0][0]);
+            glUniformMatrix4fv(glGetUniformLocation(mapShader, "uView"), 1, GL_FALSE, &view[0][0]);
+            glUniformMatrix4fv(glGetUniformLocation(mapShader, "uProj"), 1, GL_FALSE, &proj[0][0]);
+
+            glUniform3fv(glGetUniformLocation(mapShader, "uLightPos"), 1, &lightPos[0]);
+            glUniform3fv(glGetUniformLocation(mapShader, "uLightColor"), 1, &lightColor[0]);
+
+            glUniform1i(glGetUniformLocation(mapShader, "uTex0"), 0);
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, mapTexture);
-            glBindVertexArray(VAOrulerMap);
+
+            glBindVertexArray(VAOwalkingMap);
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
             drawMeasureLines(lineShader);
@@ -776,23 +857,35 @@ int main()
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
 
-        // draw humanoid
-        unifiedShader.use();
-        unifiedShader.setVec3("uLightPos", 0.0f, 20.0f, 3.0f);
-        unifiedShader.setVec3("uLightColor", 1.0f, 1.0f, 1.0f);
-        unifiedShader.setMat4("uP", proj);
-        unifiedShader.setMat4("uV", view);
-        // MOVE
-        model = glm::translate(model, humanoidPos);
 
-        // ORIENT (stand upright)
-        model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1, 0, 0));
-        // FACING
-        model = glm::rotate(model, glm::radians(humanoidYaw), glm::vec3(0, 1, 0));
-        // SCALE
-        model = glm::scale(model, glm::vec3(0.1f));
-        unifiedShader.setMat4("uM", model);
-        humanoid.Draw(unifiedShader);
+
+        //// draw humanoid #1
+        //unifiedShader.use();
+        //unifiedShader.setVec3("uLightPos", 0.0f, 20.0f, 3.0f);
+        //unifiedShader.setVec3("uLightColor", 1.0f, 1.0f, 1.0f);
+        //unifiedShader.setMat4("uP", proj);
+        //unifiedShader.setMat4("uV", view);
+
+        //// --- humanoid 1 ---
+        //glm::mat4 model1(1.0f);
+        //model1 = glm::translate(model1, humanoidPos);
+        //model1 = glm::rotate(model1, glm::radians(90.0f), glm::vec3(1, 0, 0));
+        //model1 = glm::rotate(model1, glm::radians(humanoidYaw), glm::vec3(0, 1, 0));
+        //model1 = glm::scale(model1, glm::vec3(0.1f));
+        //unifiedShader.setMat4("uM", model1);
+        //humanoid.Draw(unifiedShader);
+
+        //// --- humanoid 2 (slightly next to it) ---
+        //glm::vec3 offset(0.6f, 0.0f, 0.0f); // move along world X; tweak as needed
+        //glm::mat4 model2(1.0f);
+        //model2 = glm::translate(model2, humanoidPos + offset);
+        //model2 = glm::rotate(model2, glm::radians(90.0f), glm::vec3(1, 0, 0));
+        //model2 = glm::rotate(model2, glm::radians(humanoidYaw), glm::vec3(0, 1, 0)); // or different yaw
+        //model2 = glm::scale(model2, glm::vec3(0.1f));
+        //unifiedShader.setMat4("uM", model2);
+        //humanoid.Draw(unifiedShader);
+
+
 
 
 
