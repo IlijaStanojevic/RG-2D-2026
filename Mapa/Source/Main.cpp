@@ -221,9 +221,6 @@ void drawMeasureLines(GLuint lineShader, const glm::mat4& mvp)
 
     glBindVertexArray(measureVAO);
 
-    // Make lines visible above the map without breaking depth:
-    glEnable(GL_DEPTH_TEST);
-    // optional: polygon offset for lines (helps a bit)
     glEnable(GL_POLYGON_OFFSET_LINE);
     glPolygonOffset(-1.0f, -1.0f);
 
@@ -307,17 +304,13 @@ void mouse_click_callback(GLFWwindow* window, int button, int action, int mods)
 
     // Intersect with the map plane
     glm::vec3 hit;
-    const float MAP_Y = 0.0f;          // set this to your map's Y
+    const float MAP_Y = 0.0f;          
     if (!intersectPlane(ray, MAP_Y, hit)) return;
 
-    // Optional: clamp to map extents
-    // if (!insideMapXZ(hit, mapMinX, mapMaxX, mapMinZ, mapMaxZ)) return;
 
-    // Lift slightly so it renders on top (avoid z-fighting)
     hit.z += 0.01f;
 
-    // Delete if close to an existing point
-    const float DELETE_RADIUS_WORLD = 0.15f; // tune to your world scale
+    const float DELETE_RADIUS_WORLD = 0.15f; 
     int bestIdx = -1;
     float bestD = 1e9f;
 
@@ -444,105 +437,12 @@ int main()
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    float rulerMap[] = {
-        // x, y,  u, v
-        -1.0f,  1.0f,   0.0f, 1.0f,   // top left
-        -1.0f, -1.0f,   0.0f, 0.0f,   // bottom left
-         1.0f, -1.0f,   1.0f, 0.0f,   // bottom right
-         1.0f,  1.0f,   1.0f, 1.0f    // top right
-    };
-
-
-
-    unsigned int VAOrulerMap;
-    size_t rulerMapSize = sizeof(rulerMap);
-    unsigned int VBOrulerMap;
-    glGenVertexArrays(1, &VAOrulerMap);
-    glGenBuffers(1, &VBOrulerMap);
-
-    glBindVertexArray(VAOrulerMap);
-    glBindBuffer(GL_ARRAY_BUFFER, VBOrulerMap);
-    glBufferData(GL_ARRAY_BUFFER, rulerMapSize, rulerMap, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    glEnableVertexAttribArray(1);
 
 
 
 
 
 
-    float cubeVertices[] = {
-        // pos                 // color (red)
-        // FRONT (+Z)
-        -0.1f,-0.1f, 0.1f,      1,0,0,
-         0.1f,-0.1f, 0.1f,      1,0,0,
-         0.1f, 0.1f, 0.1f,      1,0,0,
-         0.1f, 0.1f, 0.1f,      1,0,0,
-        -0.1f, 0.1f, 0.1f,      1,0,0,
-        -0.1f,-0.1f, 0.1f,      1,0,0,
-
-        // BACK (-Z)
-        -0.1f,-0.1f,-0.1f,      1,0,0,
-        -0.1f, 0.1f,-0.1f,      1,0,0,
-         0.1f, 0.1f,-0.1f,      1,0,0,
-         0.1f, 0.1f,-0.1f,      1,0,0,
-         0.1f,-0.1f,-0.1f,      1,0,0,
-        -0.1f,-0.1f,-0.1f,      1,0,0,
-
-        // LEFT (-X)
-        -0.1f, 0.1f, 0.1f,      1,0,0,
-        -0.1f, 0.1f,-0.1f,      1,0,0,
-        -0.1f,-0.1f,-0.1f,      1,0,0,
-        -0.1f,-0.1f,-0.1f,      1,0,0,
-        -0.1f,-0.1f, 0.1f,      1,0,0,
-        -0.1f, 0.1f, 0.1f,      1,0,0,
-
-        // RIGHT (+X)
-         0.1f, 0.1f, 0.1f,      1,0,0,
-         0.1f, 0.1f,-0.1f,      1,0,0,
-         0.1f,-0.1f,-0.1f,      1,0,0,
-         0.1f,-0.1f,-0.1f,      1,0,0,
-         0.1f,-0.1f, 0.1f,      1,0,0,
-         0.1f, 0.1f, 0.1f,      1,0,0,
-
-         // TOP (+Y)
-         -0.1f, 0.1f,-0.1f,      1,0,0,
-          0.1f, 0.1f,-0.1f,      1,0,0,
-          0.1f, 0.1f, 0.1f,      1,0,0,
-          0.1f, 0.1f, 0.1f,      1,0,0,
-         -0.1f, 0.1f, 0.1f,      1,0,0,
-         -0.1f, 0.1f,-0.1f,      1,0,0,
-
-         // BOTTOM (-Y)
-         -0.1f,-0.1f,-0.1f,      1,0,0,
-         -0.1f,-0.1f, 0.1f,      1,0,0,
-          0.1f,-0.1f, 0.1f,      1,0,0,
-          0.1f,-0.1f, 0.1f,      1,0,0,
-          0.1f,-0.1f,-0.1f,      1,0,0,
-         -0.1f,-0.1f,-0.1f,      1,0,0,
-    };
-    unsigned int VAOcube, VBOcube;
-    glGenVertexArrays(1, &VAOcube);
-    glGenBuffers(1, &VBOcube);
-
-    glBindVertexArray(VAOcube);
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBOcube);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
-
-    // location 0: position (vec3)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    // location 1: color (vec3)
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-
-    glBindVertexArray(0);
 
 
 
@@ -754,17 +654,17 @@ int main()
                 camTarget.x += camSpeed;
 
             // X bounds
-            if (camTarget.x < -7.0f)
-                camTarget.x = -7.0f;
+            if (camTarget.x < -6.8f)
+                camTarget.x = -6.8f;
 
-            if (camTarget.x > 7.0f)
-                camTarget.x = 7.0f;
+            if (camTarget.x > 6.8f)
+                camTarget.x = 6.8f;
 
             if (camTarget.y < -8.0f)
                 camTarget.y = -8.0f;
 
-            if (camTarget.y > 8.0f)
-                camTarget.y = 8.0f;
+            if (camTarget.y > 7.5f)
+                camTarget.y = 7.5f;
 
 
             glm::vec3 delta = humanoidPos - prevHumanoidPos;
@@ -861,29 +761,6 @@ int main()
             }
 
 
-
-
-
-;
-
-            //glUseProgram(basicShader);
-
-            //// Send matrices
-            //glUniformMatrix4fv(glGetUniformLocation(basicShader, "uModel"), 1, GL_FALSE, &model[0][0]);
-            //glUniformMatrix4fv(glGetUniformLocation(basicShader, "uView"), 1, GL_FALSE, &view[0][0]);
-            //glUniformMatrix4fv(glGetUniformLocation(basicShader, "uProj"), 1, GL_FALSE, &proj[0][0]);
-
-            ////// Optional: give it its own model transform (recommended)
-            ////glm::mat4 cubeModel = glm::mat4(1.0f);
-            ////cubeModel = glm::translate(cubeModel, glm::vec3(0.0f, 0.0f, 0.0f));
-            ////// cubeModel = glm::rotate(cubeModel, (float)glfwGetTime(), glm::vec3(0, 1, 0));
-            ////glUniformMatrix4fv(glGetUniformLocation(basicShader, "uModel"), 1, GL_FALSE, &cubeModel[0][0]);
-
-            //// Draw
-            //glBindVertexArray(VAOcube);
-            //glDrawArrays(GL_TRIANGLES, 0, 36);
-            //glBindVertexArray(0);
-
         }
         else {
             // Draw full map
@@ -902,11 +779,11 @@ int main()
                 camTarget.x += camSpeed;
 
             // X bounds
-            if (camTarget.x < -2.0f)
-                camTarget.x = -2.0f;
+            if (camTarget.x < -1.5f)
+                camTarget.x = -1.5f;
 
-            if (camTarget.x > 2.0f)
-                camTarget.x = 2.0f;
+            if (camTarget.x > 1.5f)
+                camTarget.x = 1.5f;
 
             if (camTarget.y < -4.0f)
                 camTarget.y = -4.0f;
