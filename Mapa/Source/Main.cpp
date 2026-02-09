@@ -69,6 +69,11 @@ float camDist = 3.0f;      // zoom
 glm::vec3 camTarget(0, 0, 0); // map center
 float camSpeed = 0.1f;
 
+glm::mat4 gView(1.0f);
+glm::mat4 gProj(1.0f);
+glm::vec3 gCamPos(0.0f);
+
+
 
 glm::vec3 humanoidPos = glm::vec3(0.0f, 0.0f, 0.0f);
 float humanoidYaw = 0.0f;
@@ -92,73 +97,142 @@ GLFWcursor* cursorPressed;
 bool rezimHodanja = true;
 
 
-struct MeasurePoint { float x, y; };
-
+struct MeasurePoint {
+    float x, y, z;
+};
 std::vector<MeasurePoint> measurePoints;
 float totalMeasureDistance = 0.0f;
+
 GLuint measureVAO, measureVBO;
+
+static float distOnMap(const MeasurePoint& a, const MeasurePoint& b) {
+    float dx = b.x - a.x;
+    float dy = b.y - a.y;
+    return sqrtf(dx * dx + dy * dy)/10;
+}
+
+
+
+
 void updateMeasureBuffer()
 {
     glBindBuffer(GL_ARRAY_BUFFER, measureVBO);
 
     if (!measurePoints.empty())
-        glBufferSubData(GL_ARRAY_BUFFER, 0, measurePoints.size() * sizeof(MeasurePoint), measurePoints.data());
+        glBufferSubData(GL_ARRAY_BUFFER, 0,
+            (GLsizeiptr)(measurePoints.size() * sizeof(MeasurePoint)),
+            measurePoints.data());
 }
-void addMeasurePoint(float x, float y)
+
+void addMeasurePoint(const MeasurePoint& p)
 {
-    MeasurePoint p{ x, y };
-
     if (!measurePoints.empty()) {
-        auto& prev = measurePoints.back();
-        float dx = p.x - prev.x;
-        float dy = p.y - prev.y;
-        totalMeasureDistance += sqrtf(dx * dx + dy * dy);
+        const auto& prev = measurePoints.back();
+        totalMeasureDistance += distOnMap(prev, p);
     }
-
     measurePoints.push_back(p);
     updateMeasureBuffer();
 }
+struct Ray {
+    glm::vec3 origin;
+    glm::vec3 dir; // normalized
+};
+
+static Ray makePickRay(double mouseX, double mouseY,
+    int screenW, int screenH,
+    const glm::mat4& proj, const glm::mat4& view,
+    const glm::vec3& camPos)
+{
+    // NDC
+    float x = (float)(2.0 * mouseX / screenW - 1.0);
+    float y = (float)(1.0 - 2.0 * mouseY / screenH);
+
+    glm::mat4 invPV = glm::inverse(proj * view);
+
+    glm::vec4 nearNdc(x, y, -1.0f, 1.0f);
+    glm::vec4 farNdc(x, y, 1.0f, 1.0f);
+
+    glm::vec4 nearWorld = invPV * nearNdc;
+    glm::vec4 farWorld = invPV * farNdc;
+    nearWorld /= nearWorld.w;
+    farWorld /= farWorld.w;
+
+    glm::vec3 o = glm::vec3(nearWorld);          // or camPos
+    glm::vec3 d = glm::normalize(glm::vec3(farWorld - nearWorld));
+
+    return { o, d };
+}
+static float distPointToRay(const glm::vec3& p, const Ray& r)
+{
+    // distance from point to infinite ray line (clamp t>=0)
+    glm::vec3 v = p - r.origin;
+    float t = glm::dot(v, r.dir);
+    if (t < 0.0f) t = 0.0f;
+    glm::vec3 closest = r.origin + t * r.dir;
+    return glm::length(p - closest);
+}
+
+
+static bool intersectPlane(const Ray& r, float planeZ, glm::vec3& hit)
+{
+    const float denom = r.dir.z;
+    if (fabs(denom) < 1e-6f) return false;
+
+    float t = (planeZ - r.origin.z) / denom;
+    if (t < 0.0f) return false;
+
+    hit = r.origin + t * r.dir;
+    return true;
+}
+
+
+
 void deletePoint(int idx)
 {
-    if (idx < 0 || idx >= measurePoints.size()) return;
+    if (idx < 0 || idx >= (int)measurePoints.size()) return;
 
-    // Remove its left segment
     if (idx > 0) {
         auto& a = measurePoints[idx - 1];
         auto& b = measurePoints[idx];
-        totalMeasureDistance -= hypot(b.x - a.x, b.y - a.y);
+        totalMeasureDistance -= distOnMap(a, b);
     }
-
-    // Remove its right segment
-    if (idx < measurePoints.size() - 1) {
+    if (idx < (int)measurePoints.size() - 1) {
         auto& a = measurePoints[idx];
         auto& b = measurePoints[idx + 1];
-        totalMeasureDistance -= hypot(b.x - a.x, b.y - a.y);
+        totalMeasureDistance -= distOnMap(a, b);
     }
-
-    // Reconnect neighbors if it's in the middle
-    if (idx > 0 && idx < measurePoints.size() - 1) {
+    if (idx > 0 && idx < (int)measurePoints.size() - 1) {
         auto& a = measurePoints[idx - 1];
         auto& b = measurePoints[idx + 1];
-        totalMeasureDistance += hypot(b.x - a.x, b.y - a.y);
+        totalMeasureDistance += distOnMap(a, b);
     }
 
     measurePoints.erase(measurePoints.begin() + idx);
     updateMeasureBuffer();
 }
-void drawMeasureLines(GLuint lineShader)
+
+void drawMeasureLines(GLuint lineShader, const glm::mat4& mvp)
 {
     if (measurePoints.size() < 2) return;
 
     glUseProgram(lineShader);
-    glUniform3f(glGetUniformLocation(lineShader, "color"), 1.0f, 1.0f, 1.0f);
+    glUniformMatrix4fv(glGetUniformLocation(lineShader, "uMVP"), 1, GL_FALSE, &mvp[0][0]);
+    glUniform3f(glGetUniformLocation(lineShader, "uColor"), 1.0f, 1.0f, 1.0f);
 
     glBindVertexArray(measureVAO);
 
-    glDrawArrays(GL_LINE_STRIP, 0, measurePoints.size());
+    // Make lines visible above the map without breaking depth:
+    glEnable(GL_DEPTH_TEST);
+    // optional: polygon offset for lines (helps a bit)
+    glEnable(GL_POLYGON_OFFSET_LINE);
+    glPolygonOffset(-1.0f, -1.0f);
 
+    glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)measurePoints.size());
+
+    glDisable(GL_POLYGON_OFFSET_LINE);
     glBindVertexArray(0);
 }
+
 
 void drawMeasureDots(GLuint lineShader)
 {
@@ -168,6 +242,32 @@ void drawMeasureDots(GLuint lineShader)
     glBindVertexArray(measureVAO);
     glDrawArrays(GL_POINTS, 0, measurePoints.size());
 }
+void drawMeasurePins(Model& pin, Shader& shader,
+    const glm::mat4& view, const glm::mat4& proj,
+    const glm::vec3& lightPos, const glm::vec3& lightColor,
+    float pinScale = 0.005f)
+{
+    const float PIN_LIFT = 0.15f;
+    if (measurePoints.empty()) return;
+
+    shader.use();
+    shader.setVec3("uLightPos", lightPos);
+    shader.setVec3("uLightColor", lightColor);
+    shader.setMat4("uV", view);
+    shader.setMat4("uP", proj);
+
+    for (const auto& mp : measurePoints)
+    {
+        glm::mat4 m(1.0f);
+        m = glm::translate(m, glm::vec3(mp.x, mp.y, mp.z + PIN_LIFT));
+        m = glm::rotate(m, glm::radians(90.0f), glm::vec3(1, 0, 0));
+        m = glm::scale(m, glm::vec3(pinScale));
+
+        shader.setMat4("uM", m);
+        pin.Draw(shader);
+    }
+}
+
 
 
 
@@ -191,34 +291,50 @@ void mouse_click_callback(GLFWwindow* window, int button, int action, int mods)
 {
     if (button != GLFW_MOUSE_BUTTON_LEFT || action != GLFW_PRESS) return;
 
-    double xpos, ypos;
-    glfwGetCursorPos(window, &xpos, &ypos);
-
-    float x = (xpos / screenWidth) * 2.0f - 1.0f;
-    float y = 1.0f - (ypos / screenHeight) * 2.0f;
-
+    double mx, my;
+    glfwGetCursorPos(window, &mx, &my);
+    float x = (mx / screenWidth) * 2.0f - 1.0f;
+    float y = 1.0f - (my / screenHeight) * 2.0f;
     if (x < 0.7 && x > 0.6 && y < 1.0 && y > 0.9) {
         rezimHodanja = !rezimHodanja;
         return;
     }
 
-    if (!rezimHodanja)
-    {
-        const float DELETE_RADIUS = 0.02f;
+    if (rezimHodanja) return;
 
-        for (int i = 0; i < measurePoints.size(); i++)
-        {
-            float dx = measurePoints[i].x - x;
-            float dy = measurePoints[i].y - y;
-            if (dx * dx + dy * dy < DELETE_RADIUS * DELETE_RADIUS) {
-                deletePoint(i);
-                return;
-            }
-        }
+    // Build a pick ray using your current camera matrices
+    Ray ray = makePickRay(mx, my, screenWidth, screenHeight, gProj, gView, gCamPos);
 
-        addMeasurePoint(x, y);
+    // Intersect with the map plane
+    glm::vec3 hit;
+    const float MAP_Y = 0.0f;          // set this to your map's Y
+    if (!intersectPlane(ray, MAP_Y, hit)) return;
+
+    // Optional: clamp to map extents
+    // if (!insideMapXZ(hit, mapMinX, mapMaxX, mapMinZ, mapMaxZ)) return;
+
+    // Lift slightly so it renders on top (avoid z-fighting)
+    hit.z += 0.01f;
+
+    // Delete if close to an existing point
+    const float DELETE_RADIUS_WORLD = 0.15f; // tune to your world scale
+    int bestIdx = -1;
+    float bestD = 1e9f;
+
+    for (int i = 0; i < (int)measurePoints.size(); i++) {
+        glm::vec3 p(measurePoints[i].x, measurePoints[i].y, measurePoints[i].z);
+        float d = distPointToRay(p, ray);
+        if (d < bestD) { bestD = d; bestIdx = i; }
     }
+
+    if (bestIdx != -1 && bestD < DELETE_RADIUS_WORLD) {
+        deletePoint(bestIdx);
+        return;
+    }
+
+    addMeasurePoint(MeasurePoint{ hit.x, hit.y, hit.z });
 }
+
 
 
 
@@ -530,15 +646,16 @@ int main()
     glBindBuffer(GL_ARRAY_BUFFER, measureVBO);
 
     // allocate max size (e.g., 1000 points)
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 2 * 1000, NULL, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 3 * 1000, NULL, GL_DYNAMIC_DRAW);
 
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
     glBindVertexArray(0);
 
 
     Model humanoid("resources/humanoid.obj");
+    Model pin("resources/pin2.obj");
     Shader unifiedShader("model.vert", "model.frag");
 
 
@@ -546,7 +663,7 @@ int main()
 
 
 
-
+    glfwSetMouseButtonCallback(window, mouse_click_callback);
 
 
 
@@ -558,17 +675,18 @@ int main()
 
         double initFrameTime = glfwGetTime();
         float speed = 0.001f;
-        glfwSetMouseButtonCallback(window, mouse_click_callback);
+        
 
         glm::vec3 camPos;
-        camPos.x = camTarget.x + camDist * cos(camPitch) * sin(camYaw);
-        camPos.y = camTarget.y + camDist * sin(camPitch);
-        camPos.z = camTarget.z + camDist * cos(camPitch) * cos(camYaw);
+        gCamPos.x = camTarget.x + camDist * cos(camPitch) * sin(camYaw);
+        gCamPos.y = camTarget.y + camDist * sin(camPitch);
+        gCamPos.z = camTarget.z + camDist * cos(camPitch) * cos(camYaw);
 
+        gView = glm::lookAt(gCamPos, camTarget, glm::vec3(0, 1, 0));
+        gProj = glm::perspective(glm::radians(60.0f),
+            screenWidth / (float)screenHeight,
+            0.1f, 500.0f);
 
-
-        glm::mat4 view = glm::lookAt(camPos, camTarget, glm::vec3(0, 1, 0));
-        glm::mat4 proj = glm::perspective(glm::radians(60.0f), screenWidth / (float)screenHeight, 0.1f, 500.0f);
         glm::mat4 model = glm::mat4(1.0f);
 
 
@@ -597,7 +715,7 @@ int main()
 
         glClear(GL_COLOR_BUFFER_BIT);
         if (rezimHodanja) {
-
+            camDist = 3.0f;
             glm::vec3 prevHumanoidPos = humanoidPos;  // previous location
 
             static float lastTime = glfwGetTime();
@@ -661,8 +779,8 @@ int main()
             glUseProgram(mapShader);
 
             glUniformMatrix4fv(glGetUniformLocation(mapShader, "uModel"), 1, GL_FALSE, &model[0][0]);
-            glUniformMatrix4fv(glGetUniformLocation(mapShader, "uView"), 1, GL_FALSE, &view[0][0]);
-            glUniformMatrix4fv(glGetUniformLocation(mapShader, "uProj"), 1, GL_FALSE, &proj[0][0]);
+            glUniformMatrix4fv(glGetUniformLocation(mapShader, "uView"), 1, GL_FALSE, &gView[0][0]);
+            glUniformMatrix4fv(glGetUniformLocation(mapShader, "uProj"), 1, GL_FALSE, &gProj[0][0]);
 
             glUniform3fv(glGetUniformLocation(mapShader, "uLightPos"), 1, &lightPos[0]);
             glUniform3fv(glGetUniformLocation(mapShader, "uLightColor"), 1, &lightColor[0]);
@@ -679,8 +797,8 @@ int main()
             unifiedShader.use();
             unifiedShader.setVec3("uLightPos", lightPos);
             unifiedShader.setVec3("uLightColor", lightColor);
-            unifiedShader.setMat4("uP", proj);
-            unifiedShader.setMat4("uV", view);
+            unifiedShader.setMat4("uP", gProj);
+            unifiedShader.setMat4("uV", gView);
             // MOVE
             model = glm::translate(model, humanoidPos);
 
@@ -803,8 +921,8 @@ int main()
             glUseProgram(mapShader);
 
             glUniformMatrix4fv(glGetUniformLocation(mapShader, "uModel"), 1, GL_FALSE, &model[0][0]);
-            glUniformMatrix4fv(glGetUniformLocation(mapShader, "uView"), 1, GL_FALSE, &view[0][0]);
-            glUniformMatrix4fv(glGetUniformLocation(mapShader, "uProj"), 1, GL_FALSE, &proj[0][0]);
+            glUniformMatrix4fv(glGetUniformLocation(mapShader, "uView"), 1, GL_FALSE, &gView[0][0]);
+            glUniformMatrix4fv(glGetUniformLocation(mapShader, "uProj"), 1, GL_FALSE, &gProj[0][0]);
 
             glUniform3fv(glGetUniformLocation(mapShader, "uLightPos"), 1, &lightPos[0]);
             glUniform3fv(glGetUniformLocation(mapShader, "uLightColor"), 1, &lightColor[0]);
@@ -816,8 +934,11 @@ int main()
             glBindVertexArray(VAOwalkingMap);
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
-            drawMeasureLines(lineShader);
-            drawMeasureDots(lineShader);
+            glm::mat4 mvp = gProj * gView * glm::mat4(1.0f);
+            drawMeasureLines(lineShader, mvp);
+
+
+            drawMeasurePins(pin, unifiedShader, gView, gProj, lightPos, lightColor, 0.05f);
 
             // Draw total measured distance 
             float dist = totalMeasureDistance;
@@ -859,31 +980,7 @@ int main()
 
 
 
-        //// draw humanoid #1
-        //unifiedShader.use();
-        //unifiedShader.setVec3("uLightPos", 0.0f, 20.0f, 3.0f);
-        //unifiedShader.setVec3("uLightColor", 1.0f, 1.0f, 1.0f);
-        //unifiedShader.setMat4("uP", proj);
-        //unifiedShader.setMat4("uV", view);
 
-        //// --- humanoid 1 ---
-        //glm::mat4 model1(1.0f);
-        //model1 = glm::translate(model1, humanoidPos);
-        //model1 = glm::rotate(model1, glm::radians(90.0f), glm::vec3(1, 0, 0));
-        //model1 = glm::rotate(model1, glm::radians(humanoidYaw), glm::vec3(0, 1, 0));
-        //model1 = glm::scale(model1, glm::vec3(0.1f));
-        //unifiedShader.setMat4("uM", model1);
-        //humanoid.Draw(unifiedShader);
-
-        //// --- humanoid 2 (slightly next to it) ---
-        //glm::vec3 offset(0.6f, 0.0f, 0.0f); // move along world X; tweak as needed
-        //glm::mat4 model2(1.0f);
-        //model2 = glm::translate(model2, humanoidPos + offset);
-        //model2 = glm::rotate(model2, glm::radians(90.0f), glm::vec3(1, 0, 0));
-        //model2 = glm::rotate(model2, glm::radians(humanoidYaw), glm::vec3(0, 1, 0)); // or different yaw
-        //model2 = glm::scale(model2, glm::vec3(0.1f));
-        //unifiedShader.setMat4("uM", model2);
-        //humanoid.Draw(unifiedShader);
 
 
 
