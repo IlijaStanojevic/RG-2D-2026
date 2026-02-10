@@ -135,7 +135,7 @@ void addMeasurePoint(const MeasurePoint& p)
 }
 struct Ray {
     glm::vec3 origin;
-    glm::vec3 dir; // normalized
+    glm::vec3 dir; 
 };
 
 static Ray makePickRay(double mouseX, double mouseY,
@@ -157,14 +157,13 @@ static Ray makePickRay(double mouseX, double mouseY,
     nearWorld /= nearWorld.w;
     farWorld /= farWorld.w;
 
-    glm::vec3 o = glm::vec3(nearWorld);          // or camPos
+    glm::vec3 o = glm::vec3(nearWorld);          
     glm::vec3 d = glm::normalize(glm::vec3(farWorld - nearWorld));
 
     return { o, d };
 }
 static float distPointToRay(const glm::vec3& p, const Ray& r)
 {
-    // distance from point to infinite ray line (clamp t>=0)
     glm::vec3 v = p - r.origin;
     float t = glm::dot(v, r.dir);
     if (t < 0.0f) t = 0.0f;
@@ -172,7 +171,24 @@ static float distPointToRay(const glm::vec3& p, const Ray& r)
     return glm::length(p - closest);
 }
 
+void drawMeasureLines(GLuint lineShader, const glm::mat4& mvp)
+{
+    if (measurePoints.size() < 2) return;
 
+    glUseProgram(lineShader);
+    glUniformMatrix4fv(glGetUniformLocation(lineShader, "uMVP"), 1, GL_FALSE, &mvp[0][0]);
+    glUniform3f(glGetUniformLocation(lineShader, "uColor"), 1.0f, 1.0f, 1.0f);
+
+    glBindVertexArray(measureVAO);
+
+    glEnable(GL_POLYGON_OFFSET_LINE);
+    glPolygonOffset(-1.0f, -1.0f);
+
+    glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)measurePoints.size());
+
+    glDisable(GL_POLYGON_OFFSET_LINE);
+    glBindVertexArray(0);
+}
 static bool intersectPlane(const Ray& r, float planeZ, glm::vec3& hit)
 {
     const float denom = r.dir.z;
@@ -211,34 +227,9 @@ void deletePoint(int idx)
     updateMeasureBuffer();
 }
 
-void drawMeasureLines(GLuint lineShader, const glm::mat4& mvp)
-{
-    if (measurePoints.size() < 2) return;
-
-    glUseProgram(lineShader);
-    glUniformMatrix4fv(glGetUniformLocation(lineShader, "uMVP"), 1, GL_FALSE, &mvp[0][0]);
-    glUniform3f(glGetUniformLocation(lineShader, "uColor"), 1.0f, 1.0f, 1.0f);
-
-    glBindVertexArray(measureVAO);
-
-    glEnable(GL_POLYGON_OFFSET_LINE);
-    glPolygonOffset(-1.0f, -1.0f);
-
-    glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)measurePoints.size());
-
-    glDisable(GL_POLYGON_OFFSET_LINE);
-    glBindVertexArray(0);
-}
 
 
-void drawMeasureDots(GLuint lineShader)
-{
-    glUseProgram(lineShader);
-    glUniform3f(glGetUniformLocation(lineShader, "color"), 1, 1, 1);
 
-    glBindVertexArray(measureVAO);
-    glDrawArrays(GL_POINTS, 0, measurePoints.size());
-}
 void drawMeasurePins(Model& pin, Shader& shader,
     const glm::mat4& view, const glm::mat4& proj,
     const glm::vec3& lightPos, const glm::vec3& lightColor,
